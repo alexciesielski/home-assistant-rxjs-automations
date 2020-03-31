@@ -1,0 +1,62 @@
+{
+  "name": "home-assistant-rxjs",
+  "version": "0.0.1",
+  "author": "Alexander Ciesielski <alexander@ciesielski.co>",
+  "license": "MIT",
+  "description": "rxjs wrapper for home-assistant-js-websocket",
+  "engines": {
+    "node": ">=12"
+  },
+  "types": "dist/index.d.ts",
+  "source": "src/index.ts",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ciesielskico/home-assistant-rxjs"
+  },
+  "scripts": {
+    "dev": "tsnd -r esm --respawn src/index.ts",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "prestart": "npm run build",
+    "start": "node -r esm ./dist/index.js",
+    "lint:base": "eslint --ext .js,.json,.ts",
+    "lint": "npm run lint:base 'src/**'"
+  },
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "esm": "^3.2.25",
+    "home-assistant-rxjs": "file:../homeassistant-rxjs/dist",
+    "rxjs": "^6.5.4",
+    "ws": "^7.2.3",
+    "typescript": "^3.8.3"
+  },
+  "devDependencies": {
+    "@types/command-line-args": "^5.0.0",
+    "@types/node": "^13.9.0",
+    "@types/ws": "^7.2.3",
+    "@typescript-eslint/eslint-plugin": "^2.19.2",
+    "@typescript-eslint/parser": "^2.19.2",
+    "eslint": "^6.8.0",
+    "eslint-config-prettier": "^6.10.0",
+    "eslint-plugin-prettier": "^3.1.2",
+    "husky": "^4.2.3",
+    "lint-staged": "^10.0.7",
+    "prettier": "^1.19.1",
+    "ts-node-dev": "^1.0.0-pre.44"
+  },
+  "lint-staged": {
+    "*.{ts,js,json,css,md}": [
+      "npm run lint:base --fix",
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  }
+}
