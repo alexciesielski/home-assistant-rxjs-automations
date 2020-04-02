@@ -1,5 +1,10 @@
-import { HomeAssistantRXJS } from 'home-assistant-rxjs';
-import { take } from 'rxjs/operators';
+import { filter } from 'rxjs/operators';
+import { Home } from './home/home';
 
-const harxjs = new HomeAssistantRXJS();
-harxjs.services$.pipe(take(1)).subscribe();
+const home = new Home();
+
+home.connection$
+  .pipe(filter(c => !!c))
+  .subscribe(() => console.log('Initialized'));
+
+// new OfficeAutomations(home).flickerLights$.subscribe();

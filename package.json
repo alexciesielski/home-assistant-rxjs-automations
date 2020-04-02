@@ -18,7 +18,7 @@
     "url": "https://github.com/ciesielskico/home-assistant-rxjs"
   },
   "scripts": {
-    "dev": "tsnd -r esm --respawn src/index.ts",
+    "dev": "tsnd -r esm --transpileOnly --respawn -- src/index.ts",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "prestart": "npm run build",
@@ -29,10 +29,10 @@
   "dependencies": {
     "dotenv": "^8.2.0",
     "esm": "^3.2.25",
-    "home-assistant-rxjs": "file:../homeassistant-rxjs/dist",
+    "home-assistant-js-websocket": "^5.1.0",
     "rxjs": "^6.5.4",
-    "ws": "^7.2.3",
-    "typescript": "^3.8.3"
+    "typescript": "^3.8.3",
+    "ws": "^7.2.3"
   },
   "devDependencies": {
     "@types/command-line-args": "^5.0.0",
