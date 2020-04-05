@@ -1,18 +1,18 @@
-import { LightTurnOnAttributes } from 'home-assistant-rxjs';
-import { merge, timer } from 'rxjs';
+import { LightTurnOnAttributes } from '@ciesielskico/home-assistant-rxjs';
+import { merge, Observable, timer } from 'rxjs';
 import {
   debounce,
   filter,
   map,
-  startWith,
   switchMap,
   switchMapTo,
+  take,
   tap,
   throttleTime,
   withLatestFrom,
 } from 'rxjs/operators';
 import { Home } from '../home/home';
-import { getEntityStates, lightOptions } from '../util';
+import { checkState, ColorMode, getEntityStates, lightOptions } from '../util';
 import { Room } from '../util/room';
 import { OfficeEntity } from './entities';
 
@@ -37,35 +37,26 @@ export class OfficeRoom extends Room {
   );
   private readonly led$ = this.officeEntityStates$[OfficeEntity.CeilingLED];
 
-  readonly automations$ = merge(this.lightTurnOn() /* this.lightTurnOff() */);
+  readonly automations$ = merge(
+    this.colorMode(),
+    this.lightTurnOn(this.motion$),
+    this.lightTurnOff(),
+  );
 
-  private lightTurnOn() {
+  colorMode() {
     const intervalMs = 30 * 1000;
-    const timer$ = timer(0, intervalMs).pipe(
-      switchMapTo(this.automaticLights$),
-      filter(automaticLights => automaticLights === 'on'),
-    );
-
     const colorMode$ = this.colorMode$;
     const ledSwitch$ = this.led$;
-    const motion$ = this.motion$.pipe(
-      tap(_ => console.log('Office motion detected', _)),
-      filter(motion => motion === 'on'),
-      switchMapTo(this.automaticLights$),
-      tap(_ => console.log('Office automatic lights', _)),
-      filter(automaticLights => automaticLights === 'on'),
-      switchMapTo(this.lux$),
-      tap(_ => console.log('Office lux', _)),
-      filter(lux => lux < 100),
-      switchMapTo(this.led$),
-      // filter(led => led === 'on'),
+    const timer$ = timer(0, intervalMs).pipe(
+      checkState(this.automaticLights$, 'on'),
+      checkState(colorMode$, ColorMode.Circadian),
     );
 
-    return merge(timer$, colorMode$, ledSwitch$, motion$).pipe(
-      throttleTime(intervalMs),
-      startWith(),
-      switchMapTo(colorMode$),
-      switchMap(colorMode => lightOptions(this.home, { colorMode })),
+    return merge(timer$, colorMode$, ledSwitch$).pipe(
+      checkState(ledSwitch$, 'on'),
+      throttleTime(1000),
+      withLatestFrom(colorMode$),
+      switchMap(([, colorMode]) => lightOptions(this.home, colorMode)),
       withLatestFrom(this.colorMode$),
       map(([lightOptions, officeColorMode]) =>
         officeColorMode === 'Focus'
@@ -76,14 +67,42 @@ export class OfficeRoom extends Room {
             } as LightTurnOnAttributes)
           : lightOptions,
       ),
-      tap(_ => console.log('turn on', _)),
+      tap(_ => console.log(`Office.CeilingLED set light options\n`, _)),
       switchMap(lightOptions =>
         this.home.lights.turnOn(OfficeEntity.CeilingLED, lightOptions),
       ),
     );
   }
 
-  private lightTurnOff() {
+  lightTurnOn(motion$: Observable<string>) {
+    const motionDetected$ = motion$.pipe(
+      filter(motion => motion === 'on'),
+      checkState(this.automaticLights$, 'on'),
+      checkState(this.led$, 'off'),
+      checkState(this.lux$, state => state < 100),
+    );
+
+    return motionDetected$.pipe(
+      switchMapTo(this.colorMode$.pipe(take(1))),
+      switchMap(colorMode => lightOptions(this.home, colorMode)),
+      withLatestFrom(this.colorMode$.pipe(take(1))),
+      map(([lightOptions, officeColorMode]) =>
+        officeColorMode === 'Focus'
+          ? ({
+              ...lightOptions,
+              rgb_color: [94, 158, 225],
+              white_value: 150,
+            } as LightTurnOnAttributes)
+          : lightOptions,
+      ),
+      tap(_ => console.log(`Office.CeilingLED turn on\n`, _)),
+      switchMap(lightOptions =>
+        this.home.lights.turnOn(OfficeEntity.CeilingLED, lightOptions),
+      ),
+    );
+  }
+
+  lightTurnOff() {
     const lightsTimeout$ = this.officeEntityStates$[
       OfficeEntity.LightsTimeout
     ].pipe(map(timeout => Number(timeout)));
@@ -91,11 +110,13 @@ export class OfficeRoom extends Room {
     const motion$ = this.motion$.pipe(filter(motion => motion === 'on'));
 
     return merge(ledSwitch$, motion$).pipe(
-      switchMapTo(this.automaticLights$),
-      filter(automaticLights => automaticLights === 'on'),
-      switchMapTo(lightsTimeout$),
-      debounce(value => timer(value)),
-      tap(x => console.log('emitttttttt', x)),
+      checkState(this.automaticLights$, 'on'),
+      switchMapTo(lightsTimeout$.pipe(take(1))),
+      debounce(value => timer(value * 60 * 1000)),
+      checkState(this.automaticLights$, 'on'),
+      checkState(this.led$, 'on'),
+      tap(_ => console.log(`Office.CeilingLED turn off`)),
+      switchMapTo(this.home.lights.turnOff(OfficeEntity.CeilingLED)),
     );
   }
 }

@@ -5,8 +5,7 @@ ENV LANG C.UTF-8
 
 COPY run.sh /
 WORKDIR /usr/
-COPY example example
-COPY lib lib
+COPY src src
 COPY package.json package-lock.json tsconfig.json config.json ./
 
 

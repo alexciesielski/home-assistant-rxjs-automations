@@ -18,15 +18,23 @@
     "url": "https://github.com/ciesielskico/home-assistant-rxjs"
   },
   "scripts": {
-    "dev": "tsnd -r esm --transpileOnly --respawn -- src/index.ts",
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "dev": "tsnd -r esm --respawn src/index.ts",
+    "prebuild": "rimraf dist",
+    "build": "npm run build:main",
+    "build:main": "tsc -p tsconfig.json",
+    "build:module": "tsc -p tsconfig.module.json",
     "prestart": "npm run build",
-    "start": "node -r esm ./dist/index.js",
-    "lint:base": "eslint --ext .js,.json,.ts",
-    "lint": "npm run lint:base 'src/**'"
+    "start": "node -r esm ./dist/main/index.js",
+    "lint": "eslint lib/**",
+    "lint:fix": "npm run lint -- --fix",
+    "lint-staged": "lint-staged",
+    "typecheck": "tsc --noEmit",
+    "test": "mocha -r ts-node/register -P ./tsconfig.spec.json src/**/*.spec.ts",
+    "test:watch": "npm run test -- --extensions ts --watch --watch-files src",
+    "clean": "rimraf dist"
   },
   "dependencies": {
+    "@ciesielskico/home-assistant-rxjs": "0.0.1",
     "dotenv": "^8.2.0",
     "esm": "^3.2.25",
     "home-assistant-js-websocket": "^5.1.0",
@@ -35,22 +43,29 @@
     "ws": "^7.2.3"
   },
   "devDependencies": {
+    "@types/chai": "^4.2.11",
+    "@types/chai-spies": "^1.0.1",
     "@types/command-line-args": "^5.0.0",
+    "@types/mocha": "^7.0.2",
     "@types/node": "^13.9.0",
     "@types/ws": "^7.2.3",
     "@typescript-eslint/eslint-plugin": "^2.19.2",
     "@typescript-eslint/parser": "^2.19.2",
+    "chai": "^4.2.0",
+    "chai-spies": "^1.0.0",
     "eslint": "^6.8.0",
     "eslint-config-prettier": "^6.10.0",
     "eslint-plugin-prettier": "^3.1.2",
     "husky": "^4.2.3",
     "lint-staged": "^10.0.7",
+    "mocha": "^7.1.1",
     "prettier": "^1.19.1",
+    "rimraf": "^3.0.2",
+    "ts-node": "^8.8.1",
     "ts-node-dev": "^1.0.0-pre.44"
   },
   "lint-staged": {
     "*.{ts,js,json,css,md}": [
-      "npm run lint:base --fix",
       "prettier --write"
     ]
   },

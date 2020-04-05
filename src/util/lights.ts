@@ -1,6 +1,10 @@
-import { LightTurnOnAttributes } from 'home-assistant-rxjs/dist/types/lights';
+import {
+  LightTurnOnAttributes,
+  select,
+} from '@ciesielskico/home-assistant-rxjs';
 import { combineLatest, Observable, of } from 'rxjs';
-import { map, switchMap, take, tap } from 'rxjs/operators';
+import { map, switchMap, take } from 'rxjs/operators';
+import { HomeEntity } from '../home/entitites';
 import { Home } from '../home/home';
 
 export enum ColorMode {
@@ -9,18 +13,15 @@ export enum ColorMode {
   Party = 'Party',
 }
 
-export type LightOptionsAttributes = Partial<{ colorMode: string }>;
-
 export const lightOptions: (
   home: Home,
-  attributes?: LightOptionsAttributes,
-) => Observable<Partial<LightTurnOnAttributes>> = (home, attributes) =>
+  colorMode?: string,
+) => Observable<Partial<LightTurnOnAttributes>> = (home, colorMode) =>
   combineLatest([
-    lightColor(home, attributes),
-    lightWhiteValue(home),
-    lightBrightness(home),
+    lightColor(home, colorMode),
+    lightWhiteValue(home.getColorMode(), home.getPeopleSleepingCount()),
+    lightBrightness(home.getPeopleSleepingCount()),
   ]).pipe(
-    tap(_ => console.log('lights', _)),
     map(values =>
       values.reduce((options, option) => ({ ...options, ...option })),
     ),
@@ -29,17 +30,23 @@ export const lightOptions: (
 
 export function lightColor(
   home: Home,
-  attributes?: LightOptionsAttributes,
+  colorMode?: string,
 ): Observable<Partial<LightTurnOnAttributes>> {
-  const colorMode$ = attributes?.colorMode
-    ? of(attributes.colorMode)
-    : home.colorMode$;
+  const colorMode$ = colorMode ? of(colorMode) : home.getColorMode();
+
+  const circadian$ = home.entities.pipe(
+    select(HomeEntity.CircadianSensor, 'attributes', 'rgb_color'),
+    map(rgb_color => rgb_color as [number, number, number]),
+  );
 
   return colorMode$.pipe(
     switchMap(mode => {
       switch (mode) {
         case ColorMode.Circadian:
-          return home.circadian$.pipe(take(1));
+          return circadian$.pipe(
+            map(values => values.map(value => Math.floor(value))),
+            take(1),
+          );
 
         case ColorMode.Party:
           return of(partyColor());
@@ -49,17 +56,15 @@ export function lightColor(
           return of([255, 255, 255]);
       }
     }),
-    map(rgb_color => ({ rgb_color })),
+    map(rgb_color => ({ rgb_color: rgb_color as [number, number, number] })),
   );
 }
 
 export function lightWhiteValue(
-  home: Home,
+  colorMode$: Observable<ColorMode | string>,
+  sleepingCount$: Observable<number>,
 ): Observable<Partial<LightTurnOnAttributes>> {
-  const somebodySleeping$ = home.peopleSleepingCount$.pipe(
-    map(count => count > 0),
-  );
-  const colorMode$ = home.colorMode$;
+  const somebodySleeping$ = sleepingCount$.pipe(map(count => count > 0));
 
   return somebodySleeping$.pipe(
     switchMap(sleeping =>
@@ -75,11 +80,9 @@ export function lightWhiteValue(
 }
 
 export function lightBrightness(
-  home: Home,
+  sleepingCount$: Observable<number>,
 ): Observable<Partial<LightTurnOnAttributes>> {
-  const everybodySleeping$ = home.peopleSleepingCount$.pipe(
-    map(count => count === 2),
-  );
+  const everybodySleeping$ = sleepingCount$.pipe(map(count => count === 2));
   return everybodySleeping$.pipe(
     map(sleeping => (sleeping ? 10 : 255)),
     map(brightness => ({ brightness })),

@@ -12,3 +12,15 @@ export enum OfficeEntity {
   Lux = 'sensor.office_office_lux_sensor_116',
   Temperature = 'sensor.office_office_temperature_115',
 }
+/* 
+export const OfficeEntityMapping: Record<
+  OfficeEntity,
+  {
+    state_type: String | Number | Boolean;
+  }
+> = {
+  [OfficeEntity.AutomaticLights]: {
+    state_type: Boolean,
+  },
+};
+ */

@@ -1,9 +1,11 @@
 import {
+  filterNullOrUndefined,
   HomeAssistantEntities,
   select,
   selectState,
-} from 'home-assistant-rxjs';
+} from '@ciesielskico/home-assistant-rxjs';
 import { Observable } from 'rxjs/internal/Observable';
+import { filter, switchMapTo, take } from 'rxjs/operators';
 
 export function getEntities<T extends string>(
   hassEntities: HomeAssistantEntities,
@@ -25,8 +27,25 @@ export function getEntityStates<T extends string>(
   return entityKeys.reduce(
     (entities, id) => ({
       ...entities,
-      [id]: hassEntities.pipe(selectState(id)),
+      [id]: hassEntities.pipe(selectState(id), filterNullOrUndefined()),
     }),
     {} as any,
   );
+}
+
+export function checkState<R, T = string>(
+  entity: Observable<T>,
+  stateOrMapFn: ((state: T) => boolean) | T,
+): (source$: Observable<R>) => Observable<T> {
+  return function<T>(source$: Observable<T>) {
+    return source$.pipe(
+      switchMapTo(entity.pipe(take(1))),
+      filter(state => {
+        if (typeof stateOrMapFn === 'string') {
+          return stateOrMapFn === state;
+        }
+        return (stateOrMapFn as any)(state);
+      }),
+    );
+  };
 }

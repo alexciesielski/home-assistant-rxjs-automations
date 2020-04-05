@@ -5,16 +5,14 @@
 node -v
 npm -v
 
-npm run build
-
 CONFIG_PATH=./data/options.json
 if test -f "$CONFIG_PATH"; then
     echo "$CONFIG_PATH exists"
     TOKEN=$(jq --raw-output ".token" $CONFIG_PATH)
     
-    node -r esm dist/example/index.js --token="$TOKEN"
+    npm start -- --token="$TOKEN"
 else
-    node -r esm dist/example/index.js
+    npm start
 fi
 
 
