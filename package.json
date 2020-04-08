@@ -34,7 +34,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@ciesielskico/home-assistant-rxjs": "0.0.1",
+    "@ciesielskico/home-assistant-rxjs": "0.0.3",
     "dotenv": "^8.2.0",
     "esm": "^3.2.25",
     "home-assistant-js-websocket": "^5.1.0",

@@ -1,5 +1,4 @@
-import chai, { expect } from 'chai';
-import spies from 'chai-spies';
+import { expect } from 'chai';
 import 'mocha';
 import { of } from 'rxjs';
 import { TestScheduler } from 'rxjs/testing';
@@ -19,13 +18,10 @@ describe.skip('OfficeRoom', () => {
       turnOn: () => of('turn_on'),
       turnOff: () => of('turn_off'),
     },
+    getLightOptions: () => of({}),
   } as any;
   let office: OfficeRoom;
   let scheduler: TestScheduler;
-
-  before(() => {
-    chai.use(spies);
-  });
 
   beforeEach(() => {
     office = new OfficeRoom(home);
@@ -40,12 +36,18 @@ describe.skip('OfficeRoom', () => {
 
     it('should turn on light when motion detected', () => {
       scheduler.run(({ cold, expectObservable }) => {
-        const values = { a: 'off', b: 'on' };
-        const source$ = cold('-a--b--', values);
-        const expectedMarble = '----b';
-        const expectedValues = { b: 'turn_on' };
-        const result$ = office.lightTurnOn(source$);
-        expectObservable(result$).toBe(expectedMarble, expectedValues);
+        const motion$ = cold('  -a--b|', { a: 'off', b: 'on' });
+        const expectedMarble = '----b|';
+
+        const result$ = office.lightTurnOn({
+          motion$,
+          automaticLights$: of('on'),
+          led$: of('off'),
+          lux$: of(1),
+          colorMode$: of('Focus'),
+        });
+
+        expectObservable(result$).toBe(expectedMarble, { b: 'turn_on' });
       });
     });
   });
