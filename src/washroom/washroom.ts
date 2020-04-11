@@ -1,28 +1,30 @@
+import { selectState } from '@ciesielskico/home-assistant-rxjs';
 import { merge, Observable } from 'rxjs';
 import { debounceTime, filter, switchMapTo } from 'rxjs/operators';
 import { Home } from '../home/home';
-import { checkState, getEntityStates, Room } from '../util';
+import { checkState } from '../util';
 import { WashroomEntity } from './entities';
 
-export class WashroomRoom extends Room {
-  constructor(private home: Home) {
-    super();
-  }
+// Entities
 
-  readonly entityStates = getEntityStates<WashroomEntity>(
-    this.home.entities,
-    Object.values(WashroomEntity),
+export const washroomLight$ = (home: Home) =>
+  home.entities.pipe(selectState(WashroomEntity.Light));
+
+// Automations
+export const washroomLightTurnOffAutomation$ = (
+  home: Home,
+  config: { light$: Observable<string> },
+) => {
+  const { light$ } = config;
+  return light$.pipe(
+    filter(light => light === 'on'),
+    debounceTime(10 * 60 * 1000),
+    checkState(home.getAutomaticLights(), 'on'),
+    switchMapTo(home.lights.turnOff(WashroomEntity.Light)),
   );
+};
 
-  readonly light$ = this.entityStates[WashroomEntity.Light];
-  readonly automations$ = merge(this.lightTurnOff(this.light$));
-
-  lightTurnOff(light$: Observable<string>) {
-    return light$.pipe(
-      filter(light => light === 'on'),
-      debounceTime(10 * 60 * 1000),
-      checkState(this.home.getAutomaticLights(), 'on'),
-      switchMapTo(this.home.lights.turnOff(WashroomEntity.Light)),
-    );
-  }
-}
+export const washroomAutomation$ = (home: Home) =>
+  merge(
+    washroomLightTurnOffAutomation$(home, { light$: washroomLight$(home) }),
+  );

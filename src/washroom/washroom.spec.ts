@@ -5,7 +5,7 @@ import { BehaviorSubject, of } from 'rxjs';
 import { TestScheduler } from 'rxjs/testing';
 import { Home } from '../home/home';
 import { WashroomEntity } from './entities';
-import { WashroomRoom } from './washroom';
+import { washroomLightTurnOffAutomation$ } from './washroom';
 
 describe('WashRoom', () => {
   const light$ = new BehaviorSubject<HassEntity>({ state: 'on' } as HassEntity);
@@ -18,11 +18,9 @@ describe('WashRoom', () => {
       [WashroomEntity.Light]: light$,
     }),
   } as any;
-  let washroom: WashroomRoom;
   let scheduler: TestScheduler;
 
   beforeEach(() => {
-    washroom = new WashroomRoom(home);
     scheduler = new TestScheduler((actual, expected) => {
       expect(actual).to.deep.equal(expected);
     });
@@ -31,12 +29,12 @@ describe('WashRoom', () => {
   describe('Turn Lights On', () => {
     it('should turn off light after 10 minutes', () => {
       scheduler.run(({ cold, expectObservable }) => {
-        const values = { n: 'off', y: 'on' };
-        const source$ = cold('      -n--y--', values);
+        const source$ = cold('      -n--y--', { n: 'off', y: 'on' });
         const expectedMarble = '10m ----x';
-        const expectedValues = { x: 'turn_off' };
-        const result$ = washroom.lightTurnOff(source$);
-        expectObservable(result$).toBe(expectedMarble, expectedValues);
+        const result$ = washroomLightTurnOffAutomation$(home, {
+          light$: source$,
+        });
+        expectObservable(result$).toBe(expectedMarble, { x: 'turn_off' });
       });
     });
   });

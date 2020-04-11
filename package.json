@@ -18,7 +18,7 @@
     "url": "https://github.com/ciesielskico/home-assistant-rxjs"
   },
   "scripts": {
-    "dev": "tsnd -r esm --respawn src/index.ts",
+    "dev": "npm link \"@ciesielskico/home-assistant-rxjs\" && tsnd -r esm --respawn src/index.ts",
     "prebuild": "rimraf dist",
     "build": "npm run build:main",
     "build:main": "tsc -p tsconfig.json",
@@ -29,8 +29,8 @@
     "lint:fix": "npm run lint -- --fix",
     "lint-staged": "lint-staged",
     "typecheck": "tsc --noEmit",
-    "test": "mocha -r ts-node/register -P ./tsconfig.spec.json src/**/*.spec.ts",
-    "test:watch": "npm run test -- --extensions ts --watch --watch-files src",
+    "test:once": "mocha -r ts-node/register -P ./tsconfig.spec.json src/**/*.spec.ts",
+    "test": "npm run test:once -- --extensions ts --watch --watch-files src",
     "clean": "rimraf dist"
   },
   "dependencies": {
@@ -39,7 +39,7 @@
     "esm": "^3.2.25",
     "home-assistant-js-websocket": "^5.1.0",
     "rxjs": "^6.5.4",
-    "typescript": "^3.8.3",
+    "typescript": "^3.9.0-dev.20200411",
     "ws": "^7.2.3"
   },
   "devDependencies": {

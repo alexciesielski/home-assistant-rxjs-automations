@@ -4,6 +4,7 @@ import {
   select,
   selectState,
 } from '@ciesielskico/home-assistant-rxjs';
+import { throwError } from 'rxjs';
 import { Observable } from 'rxjs/internal/Observable';
 import { filter, switchMapTo, take } from 'rxjs/operators';
 
@@ -27,7 +28,9 @@ export function getEntityStates<T extends string>(
   return entityKeys.reduce(
     (entities, id) => ({
       ...entities,
-      [id]: hassEntities.pipe(selectState(id), filterNullOrUndefined()),
+      [id]: hassEntities
+        ? hassEntities.pipe(selectState(id), filterNullOrUndefined())
+        : throwError(`Entity ${id} not found`),
     }),
     {} as any,
   );

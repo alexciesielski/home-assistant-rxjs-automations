@@ -2,12 +2,13 @@ import {
   HomeAssistantRXJS,
   selectAttributes,
 } from '@ciesielskico/home-assistant-rxjs';
-import { from, Observable } from 'rxjs';
-import { map, merge, mergeMap } from 'rxjs/operators';
-import { OfficeRoom } from '../office';
+import { Connection } from 'home-assistant-js-websocket';
+import { merge, Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { officeAutomations$ } from '../office';
 import { getEntities, lightOptions } from '../util';
 import { Room } from '../util/room';
-import { WashroomRoom } from '../washroom/washroom';
+import { washroomAutomation$ } from '../washroom/washroom';
 import { HomeEntity } from './entitites';
 
 export class Home {
@@ -16,7 +17,7 @@ export class Home {
   readonly entities = this.harxjs.entities;
   readonly services = this.harxjs.services;
   readonly lights = this.harxjs.lights;
-  readonly connection$ = this.harxjs.connection$;
+  readonly connection$: Observable<Connection | null> = this.harxjs.connection$;
 
   readonly homeEntityStates$ = getEntities<HomeEntity>(
     this.entities,
@@ -27,10 +28,9 @@ export class Home {
   automations$?: Observable<unknown>;
 
   initialize() {
-    this.rooms = [new OfficeRoom(this), new WashroomRoom(this)];
-    this.automations$ = from(this.rooms).pipe(
-      mergeMap(room => room.automations$),
-      merge(),
+    this.automations$ = merge(
+      officeAutomations$(this),
+      washroomAutomation$(this),
     );
     this.harxjs.initialize().then(() => this.automations$!.subscribe());
   }

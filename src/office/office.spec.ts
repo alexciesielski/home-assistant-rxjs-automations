@@ -2,8 +2,11 @@ import { expect } from 'chai';
 import 'mocha';
 import { of } from 'rxjs';
 import { TestScheduler } from 'rxjs/testing';
-import { OfficeRoom } from '.';
 import { Home } from '../home/home';
+import {
+  officeLightTurnOffAutomation$,
+  officeLightTurnOnAutomation$,
+} from './office';
 
 // ' ' whitespace: horizontal whitespace is ignored, and can be used to help vertically align multiple marble diagrams.
 // '-' frame: 1 "frame" of virtual time passing (see above description of frames).
@@ -12,7 +15,7 @@ import { Home } from '../home/home';
 // '#' error: An error terminating the observable. This is the observable producer signaling error().
 // [a-z0-9] e.g. 'a' any alphanumeric character: Represents a value being emitted by the producer signaling next(). Also consider that you could map this into an object or an array like this:
 
-describe.skip('OfficeRoom', () => {
+describe('OfficeRoom', () => {
   let home: Home = {
     lights: {
       turnOn: () => of('turn_on'),
@@ -20,34 +23,45 @@ describe.skip('OfficeRoom', () => {
     },
     getLightOptions: () => of({}),
   } as any;
-  let office: OfficeRoom;
   let scheduler: TestScheduler;
 
   beforeEach(() => {
-    office = new OfficeRoom(home);
+    scheduler = new TestScheduler((actual, expected) => {
+      expect(actual).to.deep.equal(expected);
+    });
   });
 
   describe('Turn Lights On', () => {
-    beforeEach(() => {
-      scheduler = new TestScheduler((actual, expected) => {
-        expect(actual).to.deep.equal(expected);
-      });
-    });
-
-    it('should turn on light when motion detected', () => {
+    it('should turn light on when motion detected', () => {
       scheduler.run(({ cold, expectObservable }) => {
-        const motion$ = cold('  -a--b|', { a: 'off', b: 'on' });
-        const expectedMarble = '----b|';
-
-        const result$ = office.lightTurnOn({
-          motion$,
+        const source$ = cold('      -n--y--', { n: false, y: true });
+        const expectedMarble = '    ----x';
+        const result$ = officeLightTurnOnAutomation$(home, {
+          motion$: source$,
           automaticLights$: of('on'),
           led$: of('off'),
           lux$: of(1),
           colorMode$: of('Focus'),
         });
+        expectObservable(result$).toBe(expectedMarble, { x: 'turn_on' });
+      });
+    });
+  });
 
-        expectObservable(result$).toBe(expectedMarble, { b: 'turn_on' });
+  describe('Turn Lights Off', () => {
+    it('should turn light off when no motion detected after specified timeout', () => {
+      scheduler.run(({ cold, expectObservable }) => {
+        const motion$ = cold('-aaa------', { a: true });
+        const expectedMarble = '60s ---x';
+
+        const result$ = officeLightTurnOffAutomation$(home, {
+          motion$,
+          automaticLights$: of('on'),
+          led$: of('on'),
+          lightsTimeout$: of(1),
+        });
+
+        expectObservable(result$).toBe(expectedMarble, { x: 'turn_off' });
       });
     });
   });

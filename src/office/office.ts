@@ -1,4 +1,9 @@
-import { LightTurnOnAttributes } from '@ciesielskico/home-assistant-rxjs';
+import {
+  LightTurnOnAttributes,
+  selectBooleanState,
+  selectNumericState,
+  selectState,
+} from '@ciesielskico/home-assistant-rxjs';
 import { merge, Observable, timer } from 'rxjs';
 import {
   debounce,
@@ -6,126 +11,141 @@ import {
   map,
   switchMap,
   switchMapTo,
-  take,
   throttleTime,
   withLatestFrom,
 } from 'rxjs/operators';
 import { Home } from '../home/home';
-import { checkState, ColorMode, getEntityStates, lightOptions } from '../util';
-import { Room } from '../util/room';
+import { checkState, ColorMode } from '../util';
 import { OfficeEntity } from './entities';
 
-export class OfficeRoom extends Room {
-  constructor(public home: Home) {
-    super();
-  }
+export const officeColorMode$ = (home: Home) =>
+  home.entities.pipe(selectState(OfficeEntity.ColorMode));
+export const officeAutomaticLights$ = (home: Home) =>
+  home.entities.pipe(selectState(OfficeEntity.AutomaticLights));
+export const officeLuxSensor$ = (home: Home) =>
+  home.entities.pipe(selectNumericState(OfficeEntity.Lux));
+export const officeMotion$ = (home: Home) =>
+  home.entities.pipe(selectBooleanState(OfficeEntity.Motion));
+export const officeLED$ = (home: Home) =>
+  home.entities.pipe(selectState(OfficeEntity.CeilingLED));
+export const officeLightsTimeout$ = (home: Home) =>
+  home.entities.pipe(selectNumericState(OfficeEntity.LightsTimeout));
 
-  readonly officeEntityStates$ = getEntityStates<OfficeEntity>(
-    this.home.entities,
-    Object.values(OfficeEntity),
-  );
-
-  readonly colorMode$ = this.officeEntityStates$[OfficeEntity.ColorMode];
-  readonly automaticLights$ = this.officeEntityStates$[
-    OfficeEntity.AutomaticLights
-  ];
-
-  private readonly motion$ = this.officeEntityStates$[OfficeEntity.Motion];
-  private readonly lux$ = this.officeEntityStates$[OfficeEntity.Lux].pipe(
-    map(lux => Number(lux)),
-  );
-  private readonly led$ = this.officeEntityStates$[OfficeEntity.CeilingLED];
-
-  readonly automations$ = merge(
-    this.colorMode(),
-    this.lightTurnOn({
-      automaticLights$: this.automaticLights$,
-      colorMode$: this.colorMode$,
-      led$: this.led$,
-      lux$: this.lux$,
-      motion$: this.motion$,
-    }),
-    this.lightTurnOff(),
-  );
-
-  colorMode() {
-    const intervalMs = 30 * 1000;
-    const colorMode$ = this.colorMode$;
-    const ledSwitch$ = this.led$;
-    const timer$ = timer(0, intervalMs).pipe(
-      checkState(this.automaticLights$, 'on'),
-      checkState(colorMode$, ColorMode.Circadian),
-    );
-
-    return merge(timer$, colorMode$, ledSwitch$).pipe(
-      checkState(ledSwitch$, 'on'),
-      throttleTime(1000),
-      withLatestFrom(colorMode$),
-      switchMap(([, colorMode]) => lightOptions(this.home, colorMode)),
-      withLatestFrom(this.colorMode$),
-      map(([lightOptions, officeColorMode]) =>
-        officeColorMode === 'Focus'
-          ? ({
-              ...lightOptions,
-              rgb_color: [94, 158, 225],
-              white_value: 150,
-            } as LightTurnOnAttributes)
-          : lightOptions,
-      ),
-      switchMap(lightOptions =>
-        this.home.lights.turnOn(OfficeEntity.CeilingLED, lightOptions),
-      ),
-    );
-  }
-
-  lightTurnOn(config: {
+export const officeColorModeAutomation$ = (
+  home: Home,
+  config: {
     automaticLights$: Observable<string>;
     colorMode$: Observable<string>;
-    motion$: Observable<string>;
+    led$: Observable<string>;
+  },
+) => {
+  const intervalMs = 30 * 1000;
+  const { automaticLights$, led$, colorMode$ } = config;
+  const timer$ = timer(0, intervalMs).pipe(
+    checkState(automaticLights$, 'on'),
+    checkState(colorMode$, ColorMode.Circadian),
+  );
+
+  return merge(timer$, colorMode$, led$).pipe(
+    checkState(led$, 'on'),
+    throttleTime(1000),
+    withLatestFrom(colorMode$),
+    switchMap(([, colorMode]) => home.getLightOptions(colorMode)),
+    withLatestFrom(colorMode$),
+    map(([lightOptions, officeColorMode]) =>
+      officeColorMode === 'Focus'
+        ? ({
+            ...lightOptions,
+            rgb_color: [94, 158, 225],
+            white_value: 150,
+          } as LightTurnOnAttributes)
+        : lightOptions,
+    ),
+    switchMap(lightOptions =>
+      home.lights.turnOn(OfficeEntity.CeilingLED, lightOptions),
+    ),
+  );
+};
+
+export const officeLightTurnOnAutomation$ = (
+  home: Home,
+  config: {
+    automaticLights$: Observable<string>;
+    colorMode$: Observable<string>;
+    motion$: Observable<boolean>;
     led$: Observable<string>;
     lux$: Observable<number>;
-  }) {
-    const { automaticLights$, motion$, led$, lux$, colorMode$ } = config;
-    const motionDetected$ = motion$.pipe(
-      filter(motion => motion === 'on'),
-      checkState(automaticLights$, 'on'),
-      checkState(led$, 'off'),
-      checkState(lux$, state => state < 100),
-    );
+  },
+): Observable<unknown> => {
+  const { automaticLights$, motion$, led$, lux$, colorMode$ } = config;
+  const motionDetected$ = motion$.pipe(
+    filter(motion => motion),
+    checkState(automaticLights$, 'on'),
+    checkState(led$, 'off'),
+    checkState(lux$, state => state < 100),
+  );
 
-    return motionDetected$.pipe(
-      withLatestFrom(colorMode$),
-      switchMap(([, colorMode]) => lightOptions(this.home, colorMode)),
-      withLatestFrom(colorMode$),
-      map(([lightOptions, officeColorMode]) =>
-        officeColorMode === 'Focus'
-          ? ({
-              ...lightOptions,
-              rgb_color: [94, 158, 225],
-              white_value: 150,
-            } as LightTurnOnAttributes)
-          : lightOptions,
-      ),
-      switchMap(lightOptions =>
-        this.home.lights.turnOn(OfficeEntity.CeilingLED, lightOptions),
-      ),
-    );
-  }
+  return motionDetected$.pipe(
+    withLatestFrom(colorMode$),
+    switchMap(([, colorMode]) => home.getLightOptions(colorMode)),
+    withLatestFrom(colorMode$),
+    map(([lightOptions, officeColorMode]) =>
+      officeColorMode === 'Focus'
+        ? ({
+            ...lightOptions,
+            rgb_color: [94, 158, 225],
+            white_value: 150,
+          } as LightTurnOnAttributes)
+        : lightOptions,
+    ),
+    switchMap(lightOptions =>
+      home.lights.turnOn(OfficeEntity.CeilingLED, lightOptions),
+    ),
+  );
+};
 
-  lightTurnOff() {
-    const lightsTimeout$ = this.officeEntityStates$[
-      OfficeEntity.LightsTimeout
-    ].pipe(map(timeout => Number(timeout)));
-    const ledSwitch$ = this.led$;
-    const motion$ = this.motion$.pipe(filter(motion => motion === 'on'));
+export const officeLightTurnOffAutomation$ = (
+  home: Home,
+  config: {
+    automaticLights$: Observable<string>;
+    motion$: Observable<boolean>;
+    led$: Observable<string>;
+    lightsTimeout$: Observable<number>;
+  },
+) => {
+  const { automaticLights$, led$, lightsTimeout$, motion$ } = config;
+  const timeout$ = lightsTimeout$.pipe(map(timeout => Number(timeout)));
 
-    return merge(ledSwitch$, motion$).pipe(
-      checkState(this.automaticLights$, 'on'),
-      switchMapTo(lightsTimeout$.pipe(take(1))),
-      debounce(value => timer(value * 60 * 1000)),
-      checkState(this.automaticLights$, 'on'),
-      checkState(this.led$, 'on'),
-      switchMapTo(this.home.lights.turnOff(OfficeEntity.CeilingLED)),
-    );
-  }
-}
+  const motionTriggered$ = motion$.pipe(filter(motion => motion));
+
+  return merge(led$, motionTriggered$).pipe(
+    checkState(automaticLights$, 'on'),
+    withLatestFrom(timeout$),
+    debounce(([, timeout]) => timer(timeout * 60 * 1000)),
+    checkState(automaticLights$, 'on'),
+    checkState(led$, 'on'),
+    switchMapTo(home.lights.turnOff(OfficeEntity.CeilingLED)),
+  );
+};
+
+export const officeAutomations$ = (home: Home) =>
+  merge(
+    officeColorModeAutomation$(home, {
+      automaticLights$: officeAutomaticLights$(home),
+      colorMode$: officeColorMode$(home),
+      led$: officeLED$(home),
+    }),
+    officeLightTurnOnAutomation$(home, {
+      automaticLights$: officeAutomaticLights$(home),
+      colorMode$: officeColorMode$(home),
+      led$: officeLED$(home),
+      lux$: officeLuxSensor$(home),
+      motion$: officeMotion$(home),
+    }),
+    officeLightTurnOffAutomation$(home, {
+      automaticLights$: officeAutomaticLights$(home),
+      led$: officeLED$(home),
+      motion$: officeMotion$(home),
+      lightsTimeout$: officeLightsTimeout$(home),
+    }),
+  );
