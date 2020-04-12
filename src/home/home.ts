@@ -5,7 +5,6 @@ import {
 import { Connection } from 'home-assistant-js-websocket';
 import { merge, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { officeAutomations$ } from '../office';
 import { getEntities, lightOptions } from '../util';
 import { Room } from '../util/room';
 import { washroomAutomation$ } from '../washroom/washroom';
@@ -27,12 +26,18 @@ export class Home {
   rooms?: Room[];
   automations$?: Observable<unknown>;
 
-  initialize() {
+  async initialize() {
+    await this.harxjs.initialize();
+
+    const office = await import('../office/office');
+    const bedroom = await import('../bedroom/bedroom');
+
     this.automations$ = merge(
-      officeAutomations$(this),
+      office.AUTOMATIONS(),
+      bedroom.AUTOMATIONS(),
       washroomAutomation$(this),
     );
-    this.harxjs.initialize().then(() => this.automations$!.subscribe());
+    this.automations$!.subscribe();
   }
 
   getLightOptions(colorMode?: string) {
